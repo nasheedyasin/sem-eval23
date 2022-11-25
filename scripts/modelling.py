@@ -86,13 +86,10 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         next_sent_labels_pred = self.surrogate_head(sent_embeddings)
 
         # Surrogate loss
-        surr_loss = self.surr_loss(
+        if surr_loss_only: return  self.surr_loss(
             next_sent_labels_pred,
             next_sent_labels.to(dtype=torch.long)
         )
-
-        if surr_loss_only:
-            return {'loss': surr_loss}
 
         # Get the triplets
         triplet_indices = self.miner(
@@ -101,37 +98,39 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         )
 
         # Semantic contrast loss
-        sem_loss = self.sem_loss(sent_embeddings, indices_tuple=triplet_indices)
-
-
-        return {
-            'loss': sem_loss + surr_loss,
-            'surr_loss': surr_loss
-        }
+        return self.sem_loss(sent_embeddings, indices_tuple=triplet_indices)
 
     def training_step(self, batch, batch_idx, optimizer_idx):
         if optimizer_idx == 0:
-            loss_dict = self.common_step(batch, batch_idx)
+            loss = self.common_step(batch, batch_idx)
             # logs metrics for each training_step,
             # and the average across the epoch
-            for k,v in loss_dict.items():
-                self.log("tr_" + k, v.item(), prog_bar=True)
+            self.log("tr_sem_loss", loss, prog_bar=True)
 
         else:
-            loss_dict = self.common_step(batch, batch_idx, surr_loss_only=True)
+            loss = self.common_step(batch, batch_idx, surr_loss_only=True)
+            self.log("tr_surr_loss", loss, prog_bar=True)
 
-        return loss_dict['loss']
+        return loss
 
     def validation_step(self, batch, batch_idx):
-        loss_dict = self.common_step(batch, batch_idx)
+        loss = self.common_step(batch, batch_idx)
         # logs metrics for each training_step,
         # and the average across the epoch
-        for k,v in loss_dict.items():
-            self.log("val_" + k, v.item(), prog_bar=True)
+        self.log("val_sem_loss", loss, prog_bar=True)
 
-        return loss_dict['loss']
+        return loss
 
     def configure_optimizers(self):
+        # Define the propogation of the surrogate loss
+        param_dicts = [
+              {"params": self.surrogate_head.parameters()},
+              {
+                  "params": self.embedder.parameters(),
+                  "lr": self.embedder_lr,
+              },
+        ]
+
         return [
             torch.optim.AdamW(
                 self.embedder.parameters(),
@@ -139,7 +138,7 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
                 weight_decay=self.weight_decay
             ),
             torch.optim.AdamW(
-                self.surrogate_head.parameters(),
+                param_dicts,
                 lr=self.surrogate_lr,
                 weight_decay=self.weight_decay
             )
