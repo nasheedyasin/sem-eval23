@@ -1,6 +1,8 @@
 import torch
 import pytorch_lightning as pl
+
 from transformers import AutoModel
+from torch.nn import functional as F
 from sentence_transformers.models import Pooling
 from pytorch_metric_learning import miners, losses
 
@@ -87,12 +89,9 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         sent_tokens, (sent_labels, shifts) = batch
         sent_embeddings = self(**sent_tokens)
 
-        # Get the surrogate task preds
-        next_sent_labels_pred = self.surrogate_head(sent_embeddings)
-
-        # Surrogate loss
+        # Get the surrogate task preds and loss
         surr_loss =  self.surr_loss(
-            next_sent_labels_pred,
+            self.surrogate_head(sent_embeddings),
             shifts
         )
 
