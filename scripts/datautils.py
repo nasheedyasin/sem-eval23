@@ -36,8 +36,8 @@ class RRDataset(Dataset):
             while (sent_idx < num_sents):
                 curr_sent = doc_sents[sent_idx]
 
-                # Set the prev label shift to False ('0') for the first sent
-                if sent_idx == 0: prev_shift = 0
+                # Set the prev label shift to True ('1') for the first sent
+                if sent_idx == 0: prev_shift = 1
                 else:
                     prev_sent = doc_sents[sent_idx-1]
 
@@ -46,8 +46,8 @@ class RRDataset(Dataset):
                         prev_shift = 0
                     else: prev_shift = 1
 
-                # Set the next label shift to False ('0') for the last sent
-                if sent_idx == (num_sents - 1): next_shift = 0
+                # Set the next label shift to True ('1') for the last sent
+                if sent_idx == (num_sents - 1): next_shift = 1
                 else:
                     next_sent = doc_sents[sent_idx+1]
 
