@@ -135,3 +135,4 @@ data/
 # Torch models
 *.pt
 *.ckpt
+*.yaml

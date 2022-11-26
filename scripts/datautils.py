@@ -28,31 +28,42 @@ class RRDataset(Dataset):
         self.samples = list()
 
         for doc in self.doc_list:
-            doc_samples = doc['annotations'][0]['result']
+            doc_sents = doc['annotations'][0]['result']
 
-            sample_idx = 0
-            num_samples = len(doc_samples)
+            sent_idx = 0
+            num_sents = len(doc_sents)
 
-            while (sample_idx < num_samples):
-                curr_sample = doc_samples[sample_idx]
+            while (sent_idx < num_sents):
+                curr_sent = doc_sents[sent_idx]
 
-                # Check if it is the last sample
-                if sample_idx == (num_samples - 1):
-                    self.samples.append({
-                        'text': curr_sample['value']['text'],
-                        'label': self.label2id[curr_sample['value']['labels'][0]],
-                        'next_label': self.label2id[self.default_label]
-                    })
-
+                # Set the prev label shift to False ('0') for the first sent
+                if sent_idx == 0: prev_shift = 0
                 else:
-                    next_sample = doc_samples[sample_idx+1]
-                    self.samples.append({
-                        'text': curr_sample['value']['text'],
-                        'label': self.label2id[curr_sample['value']['labels'][0]],
-                        'next_label': self.label2id[next_sample['value']['labels'][0]]
-                    })
+                    prev_sent = doc_sents[sent_idx-1]
 
-                sample_idx += 1
+                    if prev_sent['value']['labels'][0] == \
+                        curr_sent['value']['labels'][0]:
+                        prev_shift = 0
+                    else: prev_shift = 1
+
+                # Set the next label shift to False ('0') for the last sent
+                if sent_idx == (num_sents - 1): next_shift = 0
+                else:
+                    next_sent = doc_sents[sent_idx+1]
+
+                    if next_sent['value']['labels'][0] == \
+                        curr_sent['value']['labels'][0]:
+                        next_shift = 0
+                    else: next_shift = 1
+
+                self.samples.append({
+                    'text': curr_sent['value']['text'],
+                    'label': self.label2id[curr_sent['value']['labels'][0]],
+                    'prev_shift': prev_shift,
+                    'next_shift': next_shift
+                })
+
+                sent_idx += 1
 
     def __len__(self):
         return len(self.samples)
@@ -60,7 +71,11 @@ class RRDataset(Dataset):
     def __getitem__(self, index):
         sample = self.samples[index]
 
-        return sample['text'], (sample['label'], sample['next_label'])
+        return sample['text'], (
+            sample['label'],
+            sample['prev_shift'],
+            sample['next_shift']
+        )
 
 
 class RRBatcher:
@@ -75,8 +90,9 @@ class RRBatcher:
     def __call__(self, batch: Sequence):
         """Use this function as the `collate_fn` mentioned earlier.
         """
-        labels = torch.tensor([sample[1][0] for sample in batch], dtype=torch.int8)
-        next_labels = torch.tensor([sample[1][1] for sample in batch], dtype=torch.int8)
+        labels = torch.tensor([sample[1][0] for sample in batch], dtype=torch.long)
+        prev_shift = torch.tensor([sample[1][1] for sample in batch], dtype=torch.float16)
+        next_shift = torch.tensor([sample[1][2] for sample in batch], dtype=torch.float16)
 
         sent_tokens = self.tokenizer(
             [sample[0] for sample in batch],
@@ -86,7 +102,7 @@ class RRBatcher:
             return_tensors='pt'
         )
 
-        return sent_tokens, (labels, next_labels)
+        return sent_tokens, (labels, torch.stack((prev_shift, next_shift), axis=1))
 
 
 class RRDataModule(pl.LightningDataModule):
