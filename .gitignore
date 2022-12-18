@@ -129,8 +129,9 @@ dmypy.json
 .pyre/
 
 
-# Data  file
+# Data  and models file
 data/
+models/
 
 # Torch models
 *.pt

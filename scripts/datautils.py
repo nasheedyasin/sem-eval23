@@ -164,7 +164,7 @@ class RRDataModule(pl.LightningDataModule):
             self.pred_dataset = RRDataset(full_dataset, self.label2id)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, collate_fn=self.batcher)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, collate_fn=self.batcher, shuffle=True)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, collate_fn=self.batcher)
