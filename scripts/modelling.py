@@ -64,7 +64,7 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         num_classes: int,
         embedding_dim: int = 128,
         semantic_filters: int = 4,
-        triplet_margin: float = 1.0,
+        triplet_margin: float = 0.2,
         surrogate_imp: float = 0.5,
         sem_infuser_lr: float = 2e-3,
         surrogate_lr: float = 1e-4,
@@ -128,15 +128,19 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         # To mine the triplets
         self.miner = miners.BatchEasyHardMiner(
             pos_strategy="hard",
-            neg_strategy="semihard"
+            neg_strategy="semihard",
+            distance=distances.LpDistance(normalize_embeddings=False)
         )
-        self.hard_miner = miners.BatchHardMiner()
+        self.hard_miner = miners.BatchHardMiner(
+            distance=distances.LpDistance(normalize_embeddings=False)
+        )
 
         # Loss function for next sentence class prediction
         self.surr_loss = torch.nn.BCEWithLogitsLoss()
         # Loss function: Fixed for now
         self.sem_loss = losses.TripletMarginLoss(
-            margin=triplet_margin
+            margin=triplet_margin,
+            distance=distances.LpDistance(normalize_embeddings=False)
         )
 
         # This is set to help with mining strategy callbacks
@@ -157,7 +161,10 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         })['sentence_embedding']
 
         # Infuse semantics
-        return self.sem_infuser(sentence_embedding)
+        sem_embeddings = self.sem_infuser(sentence_embedding)
+
+        # L2 normalize the embeddings
+        return torch.nn.functional.normalize(sem_embeddings, dim=1)
 
     def common_step(self, batch, batch_idx):
         """
