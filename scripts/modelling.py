@@ -131,6 +131,11 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
             neg_strategy="semihard",
             distance=distances.LpDistance(normalize_embeddings=False)
         )
+        self.hard_miner = miners.BatchHardMiner(
+            distance=distances.LpDistance(normalize_embeddings=False)
+        )
+
+
         # Loss function for next sentence class prediction
         self.surr_loss = torch.nn.BCEWithLogitsLoss()
         # Loss function: Fixed for now
@@ -180,23 +185,37 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         )
 
         # Get the triplets
-        triplet_indices = self.miner(
+        base_triplet_indices = self.miner(
+            sent_embeddings,
+            sent_labels
+        )
+        hard_triplet_indices = self.hard_miner(
             sent_embeddings,
             sent_labels
         )
 
         # Semantic contrast loss
-        sem_loss = self.sem_loss(
+        base_sem_loss = self.sem_loss(
             sent_embeddings,
             sent_labels,
-            indices_tuple=triplet_indices
+            indices_tuple=base_triplet_indices
         )
+        hard_sem_loss = self.sem_loss(
+            sent_embeddings,
+            sent_labels,
+            indices_tuple=hard_triplet_indices
+        )
+
+        bound = min(base_sem_loss/self.triplet_margin, 1)
+        sem_loss = bound * base_sem_loss + (1 - bound) * hard_sem_loss
 
         return {
             'loss': self.surrogate_imp * surr_loss + \
                 (1-self.surrogate_imp) * sem_loss,
             'sem_loss': sem_loss,
-            'surr_loss': surr_loss
+            'surr_loss': surr_loss,
+            'base_sem_loss': base_sem_loss,
+            'hard_sem_loss': hard_sem_loss
         }
 
     def training_step(self, batch, batch_idx):
