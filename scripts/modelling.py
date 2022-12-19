@@ -255,6 +255,7 @@ class AlterMiningStrategy(pl.Callback):
     def __init__(
         self,
         monitor: str,
+        threshold_coeff: float = 0.6,
         miner: miners.BaseMiner = None,
         keep_active_during_sanity = False
     ):
@@ -264,6 +265,7 @@ class AlterMiningStrategy(pl.Callback):
         self.active = keep_active_during_sanity
 
         self.monitor = monitor
+        self.threshold_coeff = threshold_coeff
 
         if miner is None:
             self.miner = miners.BatchHardMiner(
@@ -276,5 +278,5 @@ class AlterMiningStrategy(pl.Callback):
     def on_validation_end(self, trainer, pl_module):
         # Change mining strat when loss is <= half the margin
         if self.active and trainer.callback_metrics[self.monitor] <=\
-            (0.5 * pl_module.triplet_margin):
+            (self.threshold_coeff * pl_module.triplet_margin):
             pl_module.miner = self.miner
