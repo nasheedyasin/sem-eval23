@@ -256,8 +256,12 @@ class AlterMiningStrategy(pl.Callback):
         self,
         monitor: str,
         miner: miners.BaseMiner = None,
+        keep_active_during_sanity = False
     ):
         super().__init__()
+
+        # To prevent from activating after sanity check
+        self.active = keep_active_during_sanity
 
         self.monitor = monitor
 
@@ -266,9 +270,11 @@ class AlterMiningStrategy(pl.Callback):
                 distance=distances.LpDistance(normalize_embeddings=False)
             )
 
+    def on_sanity_check_end(self, trainer, pl_module):
+        self.active = True
+
     def on_validation_end(self, trainer, pl_module):
         # Change mining strat when loss is <= half the margin
-        if trainer.callback_metrics[self.monitor] <=\
+        if self.active and trainer.callback_metrics[self.monitor] <=\
             (0.5 * pl_module.triplet_margin):
-
             pl_module.miner = self.miner
