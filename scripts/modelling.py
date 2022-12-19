@@ -4,8 +4,7 @@ import pytorch_lightning as pl
 from transformers import AutoModel
 from torch.nn import functional as F
 from sentence_transformers.models import Pooling
-from pytorch_metric_learning import miners, losses
-from pytorch_metric_learning.regularizers import LpRegularizer
+from pytorch_metric_learning import miners, losses, distances
 
 
 class SemanticInfuser(torch.nn.Module):
@@ -133,7 +132,7 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         # Loss function: Fixed for now
         self.sem_loss = losses.TripletMarginLoss(
             margin=triplet_margin,
-            embedding_regularizer = LpRegularizer()
+            distance=distances.LpDistance(normalize_embeddings=False)
         )
 
         # Save the init arguments
