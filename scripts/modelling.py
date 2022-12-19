@@ -126,7 +126,11 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         )
 
         # To mine the triplets
-        self.miner = miners.MultiSimilarityMiner()
+        self.miner = miners.BatchEasyHardMiner(
+            pos_strategy="hard",
+            neg_strategy="semihard",
+            distance=distances.LpDistance(normalize_embeddings=False)
+        )
         # Loss function for next sentence class prediction
         self.surr_loss = torch.nn.BCEWithLogitsLoss()
         # Loss function: Fixed for now
