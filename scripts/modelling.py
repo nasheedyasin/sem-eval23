@@ -228,8 +228,11 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
               },
         ]
 
-        return torch.optim.AdamW(
-            param_dicts,
-            lr=self.surrogate_lr,
-            weight_decay=self.weight_decay
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+            torch.optim.AdamW(
+                param_dicts,
+                lr=self.surrogate_lr,
+                weight_decay=self.weight_decay
+            ),
+            patience=4
         )
