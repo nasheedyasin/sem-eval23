@@ -128,20 +128,15 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         # To mine the triplets
         self.miner = miners.BatchEasyHardMiner(
             pos_strategy="hard",
-            neg_strategy="semihard",
-            distance=distances.LpDistance(normalize_embeddings=False)
+            neg_strategy="semihard"
         )
-        self.hard_miner = miners.BatchHardMiner(
-            distance=distances.LpDistance(normalize_embeddings=False)
-        )
-
+        self.hard_miner = miners.BatchHardMiner()
 
         # Loss function for next sentence class prediction
         self.surr_loss = torch.nn.BCEWithLogitsLoss()
         # Loss function: Fixed for now
         self.sem_loss = losses.TripletMarginLoss(
-            margin=triplet_margin,
-            distance=distances.LpDistance(normalize_embeddings=False)
+            margin=triplet_margin
         )
 
         # This is set to help with mining strategy callbacks
