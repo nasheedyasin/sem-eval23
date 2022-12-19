@@ -67,7 +67,7 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
         triplet_margin: float = 1.0,
         surrogate_imp: float = 0.5,
         sem_infuser_lr: float = 2e-3,
-        surrogate_lr: float = 1e-3,
+        surrogate_lr: float = 1e-4,
         weight_decay: float = 1e-4
     ):
         """
@@ -138,6 +138,9 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
             margin=triplet_margin,
             distance=distances.LpDistance(normalize_embeddings=False)
         )
+
+        # This is set to help with mining strategy callbacks
+        self.triplet_margin = triplet_margin
 
         # Save the init arguments
         self.save_hyperparameters()
@@ -246,3 +249,26 @@ class CoherenceAwareSentenceEmbedder(pl.LightningModule):
                 "monitor": "val_sem_loss"
             },
         }
+
+
+class AlterMiningStrategy(pl.Callback):
+    def __init__(
+        self,
+        monitor: str,
+        miner: miners.BaseMiner = None,
+    ):
+        super().__init__()
+
+        self.monitor = monitor
+
+        if miner is None:
+            self.miner = miners.BatchHardMiner(
+                distance=distances.LpDistance(normalize_embeddings=False)
+            )
+
+    def on_validation_end(self, trainer, pl_module):
+        # Change mining strat when loss is <= half the margin
+        if trainer.callback_metrics[self.monitor] <=\
+            (0.5 * pl_module.triplet_margin):
+
+            pl_module.miner = self.miner
